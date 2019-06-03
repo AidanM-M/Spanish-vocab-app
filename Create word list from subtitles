@@ -1,0 +1,70 @@
+import re
+import selenium
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import time
+import pandas as pd
+
+#Define function to clean html from subtitles
+def cleanhtml(raw_html):
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', raw_html)
+    return cleantext
+
+#Open subtitles and clean them
+file = open("Nuestro Planeta subtitles.rtf", 'r').read()
+file = cleanhtml(file)
+file = file.lower()
+for i in ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '%', '*', ',', '\n', '.', '\\', '\\\n'):
+    file = file.replace(i, ' ')
+
+#Convert subtitles into a list of words in alphabetical order
+words = list(set(file.split(' ')))
+words.sort()
+words.remove('')
+
+
+#Break words up into lists of 50 to be translated
+
+nrange = []
+m = 0
+while m<(len(words)):
+    nrange.append(m)
+    m+=50
+nrange.append(len(words))
+
+
+#Create empty list to fill with translations
+All_translations = []
+
+#Translate words using google translate
+for x in range (0, (len(nrange)-1)):
+    driver = webdriver.Chrome()
+    driver.get("https://www.google.com/search?q=translate&oq=transla&aqs=chrome.0.69i59j69i60j69i57j69i60j0l2.1164j0j4&sourceid=chrome&ie=UTF-8")
+    translate_box = driver.find_element_by_xpath("//textarea[@class = 'tw-ta tw-text-large goog-textarea']")
+    
+    translated_words = []
+    
+    for x in range (nrange[x],nrange[x+1]):
+        translate_box.send_keys(words[x])
+        translate_box.send_keys(Keys.ENTER)
+        translated_words.append([words[x]])
+
+    time.sleep(1)
+    translations = driver.find_element_by_xpath("//span[@lang = 'en']").text.split('\n')
+
+    for y in range (0, len(translations)):
+        translated_words.append(translations[y])
+    All_translations.append(translated_words)
+    driver.close()
+    
+#Get all translations into a single list and remove the ones that didn't translate
+Ready_list  = []
+
+for t in All_translations:
+    for a in t:
+        if a[0]!=a[1]:
+            Ready_list.append(a)
+            
+df = pd.DataFrame(Ready_list, columns = ['Spanish', 'English'])
+df.to_csv("Nuestro Planeta words with translation.csv")
